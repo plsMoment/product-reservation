@@ -1,0 +1,5 @@
+server:
+  addr: "0.0.0.0:8080"
+db:
+  addr: "postgres_db:5432"
+  ssl_mode: disable
