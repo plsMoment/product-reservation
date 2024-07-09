@@ -22,7 +22,7 @@ const (
 )
 
 func (s *Storage) ReserveProducts(ctx context.Context, products []models.StorageProductAmount) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (s *Storage) ReserveProducts(ctx context.Context, products []models.Storage
 }
 
 func (s *Storage) ReleaseProducts(ctx context.Context, products []models.StorageProductAmount) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return err
 	}
@@ -75,28 +75,27 @@ func (s *Storage) ReleaseProducts(ctx context.Context, products []models.Storage
 }
 
 func (s *Storage) GetProductsCount(ctx context.Context, storageId int32) (models.ProductsByStorage, error) {
-	var res models.ProductsByStorage
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadOnly})
-	if err != nil {
-		return res, err
-	}
-	defer tx.Rollback(ctx)
 
-	row := tx.QueryRow(ctx, getStorageAvailabilityStmt, storageId)
-	if err = row.Scan(&res.IsStorageAvailable); err != nil {
+	var (
+		res   models.ProductsByStorage
+		batch = &pgx.Batch{}
+	)
+
+	batch.Queue(getStorageAvailabilityStmt, storageId)
+	batch.Queue(getStorageProducts, storageId)
+	resultsFromDb := s.pool.SendBatch(ctx, batch)
+	defer resultsFromDb.Close()
+
+	if err := resultsFromDb.QueryRow().Scan(&res.IsStorageAvailable); err != nil {
 		return res, fmt.Errorf("scan storage avaliability failed: %w", err)
 	}
 
-	rows, err := tx.Query(ctx, getStorageProducts, storageId)
+	rows, err := resultsFromDb.Query()
 	if err != nil {
 		return res, err
 	}
 
 	res.Products, err = pgx.CollectRows(rows, pgx.RowToStructByPos[models.ProductAmount])
-	if err != nil {
-		return res, err
-	}
 
-	err = tx.Commit(ctx)
 	return res, err
 }
