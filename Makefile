@@ -1,4 +1,4 @@
-run:
+up:
 	@docker compose up
 
 test:
