@@ -12,6 +12,7 @@ var (
 	wrongAmountValue    = errors.New("wrong amount value: amount must be greater than zero")
 )
 
+// Validate returns an error for the first incorrect field. Other fields will be ignored
 func Validate(products []models.StorageProductAmount) error {
 	for _, item := range products {
 		if item.ProductId <= 0 {
