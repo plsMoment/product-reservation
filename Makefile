@@ -1,7 +1,7 @@
 run:
-	docker compose up
+	@docker compose up
 
 test:
-	go test ./utils
+	@go test ./utils
 
-.PHONY: run
+.PHONY: run test
